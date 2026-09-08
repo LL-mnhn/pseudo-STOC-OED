@@ -1,5 +1,5 @@
-Package: BIODICAPT-OED-V0
-Title: OED workflow for BIODICAPT
+Package: pseudo-STOC-OED
+Title: OED workflow for BIODICAPT based on STOC
 Version: 0.1
 Authors@R: c(
     person(
@@ -9,8 +9,8 @@ Authors@R: c(
         email = "loic.lehnhoff@mnhn.fr"
         )
     )
-Description: Pipeline for Optimal Experimental Design (OED) applied to 
-BIODICAPT. The pipeline includes the loading and pre-processing of the 
+Description: Pratice pipeline for Optimal Experimental Design (OED) of BIODICAPT,  
+using STOC. The pipeline includes the loading and pre-processing of the 
 datasets, the setup and comparison of distribution models (SDM/SSDM/jSDM)
 and the determination of the OED under custom cost functions.
 License: GPL-3

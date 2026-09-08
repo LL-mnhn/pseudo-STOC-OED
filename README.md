@@ -1,10 +1,10 @@
-# BIODICAPT-OED
+# pseudo-STOC-OED
 
 ## Overview
 This repository serves as preparation for works on **Optimal Experimental Designs (OEDs)** for the BIODICAPT project. It focuses on the use of **STOC**: a large dataset of bird sightings, to setup the algorithms and workflow.
 
 > [!TIP]
-> A quick analysis of our results is available [**here**](https://ll-mnhn.github.io/BIODICAPT-OED/report/report.html).
+> A quick analysis of our results is available [**here**](https://ll-mnhn.github.io/pseudo-STOC-OED/report/report.html).
 
 ## Context
 ### BIODICAPT
@@ -13,7 +13,9 @@ BIODICAPT is a French initiative that aims at monitoring biodiversity of agricul
 BIODICAPT started in early-2026, the first results (data extraction of species distributions) will not be available until late-2026 or early-2027. In the meantime, we use **STOC** to prepare our workflow.
 
 ### STOC
+The French Breeding Bird Survey (FBBS, or STOC in french) is a standardised multi-species abundance dataset, based on a citizen science program, which has been running since 1989.
 
+It contains bird sightings and explanatory/environmental variables. Since it is already pre-processed, we can work directly with it, out of the box.
 
 
 ## Project description
@@ -49,18 +51,18 @@ BIODICAPT started in early-2026, the first results (data extraction of species d
 
 ## Getting Started
 ### Reading results
-Open the report in your browser (available [here](https://ll-mnhn.github.io/BIODICAPT-OED/report/report.html)). Or, alternatively, read the PDF equivalent (available [here](https://github.com/LL-mnhn/BIODICAPT-OED/blob/main/report/report.pdf)).
+Open the report in your browser (available [here](https://ll-mnhn.github.io/pseudo-STOC-OED/report/report.html)). Or, alternatively, read the PDF equivalent (available [here](https://github.com/LL-mnhn/pseudo-STOC-OED/blob/main/report/report.pdf)).
 
 ### How to use scripts
 1\. Clone this repository on your machine
 ```bash
 cd /your/local/folder
-git clone https://github.com/LL-mnhn/BIODICAPT-OED.git
+git clone https://github.com/LL-mnhn/pseudo-STOC-OED.git
 ```
 
 2\. Install dependencies
 
-Open `BIODICAPT-OED` as a new session in [Rstudio](https://docs.posit.co/ide/user/) or [Positron](https://positron.posit.co/welcome.html). Use R 4.6.1 (version used during development) 
+Open `pseudo-STOC-OED` as a new session in [Rstudio](https://docs.posit.co/ide/user/) or [Positron](https://positron.posit.co/welcome.html). Use R 4.6.1 (version used during development) 
 
 Install `renv` if not already installed on your machine. Then run:
 ```R

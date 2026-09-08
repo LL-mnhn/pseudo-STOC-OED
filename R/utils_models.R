@@ -973,7 +973,9 @@ load_metric_scores <- function(run_path, subset_name, metric) {
 #       Path to parent of subfolders containing `{subset_name}_scores.csv`.
 #   - reference_model_combination: a list of single parameters. 
 #   - loop_model_combination: a list of parameters (single, 
-#       except one parameter, that is a vector of several elements). 
+#       except one parameter, that is a vector of several elements).
+#   - loop_on: a string. The name of a parameter in a combination. 
+#       The parameter which has several values.
 #   - k_fold: a numeric. The number of cross-validation subsets to make. 
 #   - metric: a string. Metric to extract from file (MSE, RMSE, AUC or TjuR2).
 #   - subset_names: a list string. Usually c("train", "val", "test").
@@ -1028,6 +1030,8 @@ load_reference_and_other_scores <- function(
 #   - reference_model_combination: a list of single parameters. 
 #   - loop_model_combination: a list of parameters (single, 
 #       except one parameter, that is a vector of several elements). 
+#   - loop_on: a string. The name of a parameter in a combination. 
+#       The parameter which has several values.
 #   - k_fold: a numeric. The number of cross-validation subsets to make. 
 #   - metric: a string. Metric to extract from file (MSE, RMSE, AUC or TjuR2).
 #   - subset_names: a list string. Usually c("train", "val", "test").
@@ -1174,6 +1178,8 @@ compute_score_diffs <- function(
 #   - reference_model_combination: a list of single parameters. 
 #   - loop_model_combination: a list of parameters (single, 
 #       except one parameter, that is a vector of several elements).
+#   - loop_on: a string. The name of a parameter in a combination. 
+#       The parameter which has several values.
 #   - k_fold: a numeric. The number of cross-validation subsets to make. 
 #   - metric: a string. Metric to extract from file (MSE, RMSE, AUC or TjuR2).
 #   - subset_names: a list string. Usually c("train", "val", "test").
@@ -1278,6 +1284,8 @@ compute_number_of_improvements <- function(
 #       Path to parent of subfolders containing `{subset_name}_scores.csv`.
 #   - loop_model_combination: a list of parameters (single, 
 #       except one parameter, that is a vector of several elements).
+#   - loop_on: a string. The name of a parameter in a combination. 
+#       The parameter which has several values.
 #   - k_fold: a numeric. The number of cross-validation subsets to make. 
 #       Goes after suffix.
 #   - xlabel: a string. The xlabel for the plot (default is "Model type").
@@ -1450,6 +1458,8 @@ barplot_raw_scores <- function(
 #   - reference_model_combination: a list of single parameters. 
 #   - loop_model_combination: a list of parameters (single, 
 #       except one parameter, that is a vector of several elements).
+#   - loop_on: a string. The name of a parameter in a combination. 
+#       The parameter which has several values.
 #   - k_fold: a numeric. The number of cross-validation subsets to make. 
 #   - metric: a string. Metric to extract from file (MSE, RMSE, AUC or TjuR2).
 #   - subset_names: a list string. Usually c("train", "val", "test").
@@ -1608,6 +1618,8 @@ boxplot_compare_scores <- function(
 #   - reference_model_combination: a list of single parameters. 
 #   - loop_model_combination: a list of parameters (single, 
 #       except one parameter, that is a vector of several elements).
+#   - loop_on: a string. The name of a parameter in a combination. 
+#       The parameter which has several values.
 #   - k_fold: a numeric. The number of cross-validation subsets to make. 
 #   - metric: a string. Metric to extract from file (MSE, RMSE, AUC or TjuR2).
 #   - subset_names: a list string. Usually c("train", "val", "test").
@@ -1721,6 +1733,8 @@ boxplot_sp_improvements <- function(
 #       If NULL, does not save pdf.
 #   - loop_model_combination: a list of parameters (single, 
 #       except one parameter, that is a vector of several elements).
+#   - loop_on: a string. The name of a parameter in a combination. 
+#       The parameter which has several values.
 #   - k_fold: a numeric. The number of cross-validation subsets to make. 
 #   - metric: a string. Metric to extract from file (MSE, RMSE, AUC or TjuR2).
 #   - subset_names: a list string. Usually c("train", "val", "test").
@@ -1917,6 +1931,7 @@ lineplot_model_scores <- function(
         metric,
         xlabel = "Model type",
         ylabel = "Average Score",
+        fit_poly = 2,
         group_species = TRUE,
         species_names = NULL,
         subset_names = c("train", "val", "test"),
@@ -1972,8 +1987,9 @@ lineplot_model_scores <- function(
     ### Aggregate
     model_list <- list()
     for (subset in subset_names) {
-        model_list[[subset]] <- lmer(score ~ loop_element + (1 | k_fold) + (1 | species),
-                data = subset(scores_df, dataset == subset)) 
+        model_list[[subset]] <- lmer(
+            score ~ poly(loop_element, fit_poly) + (1 | k_fold) + (1 | species),
+            data = subset(scores_df, dataset == subset)) 
         # # The model will estimate the average effect of each value of loop_element 
         # # on the metric, with a random effect of k_fold and species
         # cat(paste(toupper(subset), "\n"))
@@ -1984,7 +2000,7 @@ lineplot_model_scores <- function(
     # Fitted lines
     if (group_species) {
         pred_df <- bind_rows(lapply(names(model_list), function(subset) {
-            ggpredict(model_list[[subset]], terms = "loop_element") |>
+            ggpredict(model_list[[subset]], terms = "loop_element [all]") |>
                 as.data.frame(terms_to_colnames = TRUE) |>
                 mutate(dataset = subset)
         }))
@@ -2077,4 +2093,273 @@ lineplot_model_scores <- function(
 
     finalize_plot(p, save_to, what = "performances")
     return(list(plot= p, data_df=aggregated_df, models=model_list))
+}
+
+# A function to make statistical comparisons of scores depending on a numeric
+# and a qualitative effect.
+# ARGS:
+#   - parent_folder: a string. 
+#       Path to parent of subfolders containing `{subset_name}_scores.csv`.
+#   - loop_model_combinations: list of lists of parameters (single, 
+#       except one parameter, that is a vector of several elements).
+#   - type_loop_on: a string. A name within a combination: category displayed 
+#       as different colors.
+#   - x_loop_on: a string. A name within a combination: category (numeric) 
+#       displayed on the x-axis.
+#   - k_fold: a numeric. The number of cross-validation subsets to make. 
+#   - metric: a string. Metric to extract from file (MSE, RMSE, AUC or TjuR2).
+#   - relative_diff: a boolean. Whether to display the results as raw scores 
+#       or relative differences.
+#   - fit_poly: an integer. The value passed to poly(loop_element, fit_poly).
+#   - subset_names: a list string. Usually c("train", "val", "test").
+#   - xlabel: a string. The xlabel for the plot (default is "Model type").
+#   - ylabel: a string. The ylabel for the plot (default is "Average Score").
+#   - species_names: names of species in CSV 
+#       (rownames are not available from csvs).
+#   - show_n_improved: a boolean. If TRUE (default) shows the number of species
+#       that improved by more than `improvement_threshold`. 
+#       Overwrites relative_diff
+#   - improvement_threshold: a float. When show_n_improved, the improvement in 
+#       percentage to count a prediction as being better than baseline.
+#       Default is 0.01 (1%).
+#   - save_to: a string. Path which should end with .pdf. 
+#       If NULL, does not save pdf.
+multi_lineplot_model_scores <- function(
+        parent_folder,
+        loop_model_combinations,
+        type_loop_on,
+        x_loop_on,
+        k_fold,
+        metric,
+        xlabel = "Model type",
+        ylabel = "Average Score",
+        species_names = NULL,
+        subset_names = c("train", "val", "test"),
+        fit_poly = 2,
+        relative_diff = FALSE,
+        improvement_threshold = 0.01,
+        show_n_improved = TRUE,
+        save_to = NULL) {
+
+    # "Improvement" is only meaningful for a lower-is-better metric like MSE.
+    # If you need this for a higher-is-better metric, flip the sign in the
+    # rel_improvement calculation below (or set show_n_improved = FALSE to
+    # fall back to the original average-score plot).
+    if (show_n_improved && metric != "MSE") {
+        stop("show_n_improved assumes a lower-is-better metric (MSE). ",
+             "Set show_n_improved = FALSE to plot other metrics as before.")
+    }
+
+    # test if we got several models (at least 2)
+    if (!all(
+            names(loop_model_combinations[[1]]) ==
+            names(loop_model_combinations[[2]]))) {
+        stop("loop_model_combinations was not initialised correctly.")
+    }
+
+    # loop on in combination to get scores
+    overall_pred_df <- NULL
+    type_order <- NULL
+    all_lmer_models <- NULL
+    all_scores <- NULL
+
+    for (j in 1:length(loop_model_combinations)) {
+        loop_elements <- loop_model_combinations[[j]][[x_loop_on]]
+        run_paths <- make_run_path(
+            parent_folder, loop_model_combinations[[j]], "")
+        model_type <- loop_model_combinations[[j]][[type_loop_on]]
+        type_order <- c(type_order, model_type)
+
+        # No auto import of results in this function (mainly because I didnt need
+        # it at the time...)
+        # The following loop import each necessary scores.csv file and parse it
+        # into a dataframe.
+        cli_alert_info("Fetching scores...")
+        scores_df <- data.frame()
+        for (k in seq(k_fold)) {
+            for (i in 1:length(run_paths)) {
+                run_path <- paste0(run_paths[i], k)
+                loop_element <- loop_elements[i]
+
+                if (is.list(loop_element)) {
+                    if (is_formula(loop_element[[1]])) {
+                        loop_element <- length(all.vars(loop_element[[1]]))
+                    } else {
+                        stop("Function was not made to handle loop_element as list when not a formula.")
+                    }
+                }
+
+                for (subset_name in subset_names) {
+                    local_csv <- suppressMessages(load_metric_scores(
+                        run_path, subset_name, metric = NULL))
+                    subset_scores <- local_csv |>
+                        mutate(species = factor(species_names)) |>
+                        pivot_longer(
+                            cols = c(all_of(metric)),
+                            names_to = "score_type", values_to = "score") |>
+                        mutate(
+                            loop_element = loop_element,
+                            k_fold = k,
+                            dataset = subset_name,
+                            type = model_type)
+
+                    scores_df <- rbind(scores_df, subset_scores)
+                }
+            }
+        }
+
+        # --- Per-species relative improvement vs a baseline ---
+        # Baseline = each species' own score at the smallest loop_element
+        # within its (species, k_fold, dataset, type) group (same reference
+        # point the old relative_diff block used). "improved" flags species
+        # whose MSE dropped by more than improvement_threshold (fraction of
+        # baseline), e.g. 0.01 = 1%.
+        scores_df <- scores_df |>
+            group_by(species, k_fold, dataset, type) |>
+            mutate(
+                baseline = score[which.min(loop_element)],
+                rel_improvement = (baseline - score) / baseline,
+                improved = rel_improvement > improvement_threshold) |>
+            ungroup()
+
+        # Old behaviour preserved: turn score into an absolute difference
+        # from baseline when relative_diff = TRUE and show_n_improved = FALSE.
+        if (relative_diff) {
+            scores_df <- scores_df |>
+                mutate(score = score - baseline)
+        }
+        scores_df <- scores_df |> select(-baseline)
+
+        # Drop the baseline loop_element itself when counting/modelling
+        # "improved" species: by construction rel_improvement == 0 there,
+        # so it's not a real data point for this metric and would bias the
+        # model fit (and the plot) toward a forced zero at the left edge.
+        if (show_n_improved) {
+            scores_df <- scores_df |>
+                group_by(species, k_fold, dataset, type) |>
+                filter(loop_element != loop_element[which.min(loop_element)]) |>
+                ungroup()
+        }
+       
+        all_scores <- bind_rows(all_scores, scores_df)
+
+        ### Aggregate
+        model_list <- list()
+        if (show_n_improved) {
+            # Collapse species into a per-(loop_element, k_fold, dataset)
+            # count of "improved" species, then model that count across
+            # loop_element. Species can no longer be a random effect since
+            # it has been summed away; k_fold remains one.
+            n_improved_df <- scores_df |>
+                group_by(loop_element, k_fold, dataset, type) |>
+                summarise(n_improved = sum(improved, na.rm = TRUE), .groups = "drop")
+
+            for (subset in subset_names) {
+                # NOTE: a Poisson/negative-binomial GLMM (e.g. glmer with
+                # family = poisson) is statistically a more natural
+                # choice for count data than lmer
+                model_list[[subset]] <- lmer(
+                    n_improved ~ poly(loop_element, fit_poly) + (1 | k_fold),
+                    data = subset(n_improved_df, dataset == subset))
+            }
+        } else {
+            for (subset in subset_names) {
+                model_list[[subset]] <- lmer(
+                    score ~ poly(loop_element, fit_poly) + (1 | k_fold) + (1 | species),
+                    data = subset(scores_df, dataset == subset))
+            }
+        }
+        all_lmer_models <- c(all_lmer_models, model_list)
+
+        # Fitted lines
+        pred_df <- bind_rows(lapply(names(model_list), function(subset) {
+            ggpredict(model_list[[subset]], terms = "loop_element [all]") |>
+                as.data.frame(terms_to_colnames = TRUE) |>
+                mutate(
+                    dataset = subset,
+                    type = model_type)
+        }))
+
+        pred_df <- pred_df |>
+            mutate(dataset = factor(dataset, levels = subset_names))
+
+        overall_pred_df <- bind_rows(overall_pred_df, pred_df)
+    }
+
+    overall_pred_df <- overall_pred_df |>
+        mutate(type = factor(type, levels = type_order))
+
+    # Scatter plot of means
+    group_these_columns <- c("loop_element", "dataset", "type")
+
+    if (show_n_improved) {
+        # Per-point value = number of species improved > threshold in that
+        # fold, averaged across k_folds.
+        aggregated_df <- all_scores |>
+            group_by(loop_element, k_fold, dataset, type) |>
+            summarise(n_improved = sum(improved, na.rm = TRUE), .groups = "drop") |>
+            group_by(across(all_of(group_these_columns))) |>
+            summarise(avg_score = mean(n_improved, na.rm = TRUE), .groups = "drop_last") |>
+            mutate(dataset = factor(dataset, levels = subset_names)) |>
+            mutate(type = factor(type, levels = type_order))
+    } else {
+        aggregated_df <- all_scores |>
+            group_by(across(all_of(group_these_columns))) |>
+            summarise(
+                avg_score = mean(score, na.rm = TRUE),
+                .groups = "drop_last") |>
+            mutate(dataset = factor(dataset, levels = subset_names)) |>
+            mutate(type = factor(type, levels = type_order))
+    }
+
+    cli_alert_info("Creating plot...")
+
+    p <- ggplot() +
+        # Ribbon model predictions
+        geom_ribbon(data = overall_pred_df,
+                    aes(
+                        x = loop_element,
+                        ymin = conf.low, ymax = conf.high,
+                        fill = type),
+                    alpha = 0.25) +
+        # # line from model predictions (hidden)
+        # geom_line(data = overall_pred_df,
+        #             aes(x = loop_element, y = predicted, color = type),
+        #             linewidth = 1) +
+
+        # Points + line from the aggregated data
+        geom_point(data = aggregated_df,
+                    aes(x = loop_element, y = avg_score, color = type),
+                    size = 1) +
+        geom_line(data = aggregated_df,
+                    aes(x = loop_element, y = avg_score, color = type)) +
+        labs(x = "loop_element",
+             y = if (show_n_improved) "N species improved" else "Predicted metric",
+             color = "Model type", fill = "Model type") +
+        theme_minimal()
+
+    bottom_caption <- if (show_n_improved) {
+        paste0(
+            "Number of species with a MSE improvement > ",
+            improvement_threshold * 100,
+            "% vs baseline.\nMean over all k_folds, per subset. 95% CI computed with quadratic lmer.")
+    } else {
+        paste("Comparison of means over all k_folds, per subset. 95% CI computed with quadratic lmer.")
+    }
+
+    p <- p +
+        labs(caption = bottom_caption) +
+        facet_grid( ~ dataset, scales = "fixed")
+
+    p <- my_custom_ggplot_theme(p, with_palette = TRUE, LIGHT = TRUE) +
+        xlab(xlabel) +
+        ylab(if (show_n_improved) "Number of species improved" else ylabel) +
+        guides(fill = "none")
+
+    if ((relative_diff) & (metric == "MSE") & !show_n_improved) {
+        p <- p + scale_y_reverse()
+    }
+
+    finalize_plot(p, save_to, what = "performances")
+    return(list(plot = p, data_df = aggregated_df, models = all_lmer_models))
 }
